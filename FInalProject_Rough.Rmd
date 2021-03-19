@@ -1,0 +1,212 @@
+---
+title: "Leaflet Exercises"
+author: "Geoffrey Arnold"
+date: "12/23/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require(rgdal)
+require(leaflet)
+require(leaflet.extras)
+
+require(dplyr)
+require(readxl)
+require(stringr)
+library(rgdal)
+library(RColorBrewer)
+library(GISTools)
+
+```
+
+# In class Exercises
+
+##
+
+# Blank map with provider selector
+
+```{r, controls}
+leaflet() %>%
+  # Basemaps
+  addTiles(group = "OSM (default)") #%>%
+#   addProviderTiles("Stamen.Toner", group = "Toner") %>%
+#   addProviderTiles("Stamen.TonerLite", group = "Toner Lite") %>%
+#   # Layers control
+#   addLayersControl(
+#     baseGroups = c("OSM (default)", "Toner", "Toner Lite")#,
+# #    options = layersControlOptions(collapsed = FALSE)
+#   )
+```
+
+
+## Shape with Colors
+
+```{r, polygon}
+# op_data <- read_excel("Geographies_of_Opportunity_Ranking_Well_Being_by_Congressional_District_(114th_Congress).xlsx") %>%
+#   mutate(Number = str_pad(Number, 4, pad = "0"))
+# 
+# cds.load <- readOGR("./cb_2015_us_cd114_500k/cb_2015_us_cd114_500k.shp", layer = "Allegheny_County_Census_Tracts_2016", GDAL1_integer64_policy = TRUE)
+
+
+# # Download the shapefile. (note that I store it in a folder called DATA. You have to change that if needed.)
+# download.file("http://thematicmapping.org/downloads/TM_WORLD_BORDERS_SIMPL-0.3.zip" , destfile="DATA/world_shape_file.zip")
+# # You now have it in your current working directory, have a look!
+# 
+# # Unzip this file. You can do it with R (as below), or clicking on the object you downloaded.
+# system("unzip DATA/world_shape_file.zip")
+# #  -- > You now have 4 files. One of these files is a .shp file! (TM_WORLD_BORDERS_SIMPL-0.3.shp)
+
+#reading the data in
+acs.data <- read_csv("CombinedTable_1019_ZIndex.csv")
+
+#cleaning up the data
+acs.data$zscore_disadvantage <- as.numeric(acs.data$zscore_disadvantage)
+acs.data <-
+  acs.data %>%
+  filter(!is.na(zscore_disadvantage))
+
+class(acs.data$zscore_disadvantage)
+#sum(is.na(acs.data$zscore_disadvantage))
+count(acs.data$" ")
+
+#reading the shapefile in
+mapper <- readOGR( 
+  dsn = paste0(getwd(),"/ShapeFile") , 
+  layer="Allegheny_County_Census_Tracts_2016",
+  verbose=FALSE
+)
+
+#reading in the rivers shapefile
+map.rivers <- readOGR( 
+  dsn = paste0(getwd(),"/Allegheny_County_Major_Rivers-shp") , 
+  layer="Major_Rivers",
+  verbose=FALSE
+)
+
+#seems like the same regions as my data
+length(mapper)
+
+# Just having the matching GEOID's
+#they are all mathcing so do we need a match?
+geo.match <- mapper[mapper$GEOID %in% acs.data$GEOID2,]
+length(geo.match)
+
+geo.match@data <- merge(geo.match@data, acs.data, sort = FALSE, by.x = "GEOID", by.y = "GEOID2")
+
+#Mapping rivers 
+# geo.match2 <- mapper[map.rivers$GEOID %in% geo.match@data$GEOID,]
+# geo.match2@data <- merge(geo.match2@data, geo.match@data, sort = FALSE, by.x = "GEOID", by.y = "GEOID")
+# 
+# geo.match2@data
+
+# colours
+#mybins <- c(-2,-1.5,-1,0,1, 1.5,2, 2.5,3)
+mybins <- c(-2,-1,0,1,2,3)
+colours <- colorBin(palette = "viridis",
+                  domain = mapper@data$zscore_disadvantage,
+                  na.color = "transparent",
+                  bins = mybins)
+
+# colours <- colorNumeric(
+#   palette = "viridis",
+#   domain = mapper@data$zscore_disadvantage)#, 
+# #  na.color ="transparent")
+
+geo.match@data$zscore_disadvantage
+
+# leaflet(data = geo.match) %>%
+#   addTiles(group = "OSM (default)") %>%
+#   setView(lat = 40.440624, lng = -79.995888, zoom = 10) %>%
+#   addPolygons(stroke = TRUE, 
+#               fillOpacity = 0.9,
+# #              smoothFactor = 0.5,
+#               color="white", 
+#               weight=0.3) %>%#,
+#               # popup = ~paste0("<br />","Unemployemnt: ", 100-male_employment_rate, "%" , "</br /> ", "Population: ", total_pop, "</br /> ", 'Black Population: ', round((black_pop/total_pop)*100,2),"%", "</br /> ", "Poverty: ", all_poverty_pct,"%", "</br /> ", "Disadvantage score: ", round(zscore_disadvantage, 2)),
+#               fillColor = ~colors(zscore_disadvantage) %>%
+#   addLegend(position = "bottomright", pal = colours, values = geo.match@data$zscore_disadvantage, title = "disadvantge score")
+
+#histgrammin to see what colour scale to use
+# load ggplot2
+library(ggplot2)
+
+# Distribution of the population per country?
+geo.match@data %>% 
+  ggplot( aes(x=as.numeric(zscore_disadvantage))) + 
+    geom_histogram(bins=20, fill='#69b3a2', color='white') +
+    xlab("disdvantage score") + 
+    theme_bw()
+
+# Final Map
+leaflet(geo.match) %>% 
+  addTiles()  %>% 
+  setView(lat = 40.440624, lng = -79.995888, zoom = 10) %>%
+  addPolygons( 
+    fillColor = ~colours(zscore_disadvantage), 
+    stroke=TRUE, 
+    fillOpacity = 0.9, 
+    color="white", 
+    weight=0.3,
+    popup = ~paste0("<br/>","Population: ", total_pop,"</br/> ", "Unemployemnt: ", round(100-male_employment_rate,2), "%" , "</br /> ", "Poverty rate: ", all_poverty_pct,"%", "</p/> ", "<b>","Disadvantage score: ", round(zscore_disadvantage, 2), "</b>")
+    ) %>%
+        addLegend(position = "bottomright", pal = colours, opacity = 0.9, values = ~zscore_disadvantage, title = "disadvantage score")
+
+### make other layer about proortion of miniroites 
+
+   # label = mytext,
+   # labelOptions = labelOptions(
+   #    style = list("font-weight" = "normal", padding = "3px 8px"),
+   #    textsize = "13px",
+   #    direction = "auto"
+   
+#label <- to add as label isetad of popup
+# mytext <- paste("<br />","Unemployemnt: ", 100-geo.match@data$male_employment_rate,"%" , "<br/> ", 
+#                 "Population: ", geo.match@data$total_pop, "<br/> ", 
+#                 'Black Population: ', round((geo.match@data$black_pop/geo.match@data$total_pop)*100,2),"%", "<br />", 
+#                 "Poverty: ", geo.match@data$all_poverty_pct,"%", "<br/> ",
+#                 "Disadvantage score: ", round(geo.match@data$zscore_disadvantage, 2))
+```
+
+
+# Heatmap
+```{r, heat}
+#Rcentroids
+class(mapper)
+plot(mapper)
+
+#read data from shape file to a spatial dataframe
+writeSpatialShape(mapper, "mapper")
+cents <- coordinates(mapper)
+cents2 <- SpatialPointsDataFrame(coords = cents, data=mapper@data, 
+                   proj4string=CRS("+proj=longlat +ellps=clrk66"))
+# #points(cents, col = "Blue")
+plot(cents2)
+writeSpatialShape(cents2, "cents2")
+
+#coordinates and other shit
+cents2
+
+#just the coords
+cents
+#x-cords
+cents[,1]
+cents[,2]
+
+#heatmap
+leaflet(data = geo.match) %>%
+  addTiles(group = "OSM (default)") %>%
+  setView(lat = 40.440624, lng = -79.995888, zoom = 10) %>%
+  addHeatmap(lng = ~cents[,1], lat = ~cents[,2], radius = 20, intensity = (geo.match@data$black_pop/geo.match@data$total_pop)*100, blur = 20, max = 0.05)#,
+#  popup = ~paste0("<br/>","Population: ", total_pop,"</br/> ", "Unemployemnt: ", round(100-male_employment_rate,2), "%" , "</br /> ", "Poverty rate: ", all_poverty_pct,"%", "</p/> ", "<b>","Disadvantage score: ", round(zscore_disadvantage, 2), "</b>")
+#    ) %>%
+#       addLegend(position = "bottomright", pal = colours, opacity = 0.9, valuestitle = "black population")
+
+  
+
+#class(geo.match@data$total_pop)
+```
+
+
+
+
+
