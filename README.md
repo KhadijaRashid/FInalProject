@@ -6,3 +6,5 @@ The project looks at the disadvantage neighborhoods of Pittsburgh and analyses i
 4.	male unemployment for individuals over 25 years of age 
 
 The project maps the disadvantage and the areas where a large number of black communities live. It graphs the racial composition across the years and looks at the poverty levels of each tract/neighborhood across the years. 
+
+link for the app: https://khadijarashid.shinyapps.io/FinalProject_Disadvantage_Pittsburgh/
