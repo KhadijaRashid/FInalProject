@@ -25,6 +25,7 @@ acs.data <-
 acs.data1 <- acs.data
 
 
+
 # mixin the coulms for all the stats i am interested in: populations
 races <- c("asian_pop", "black_pop", "hispanic_pop", "islander_pop", "multi_race_pop", "native_pop", "other_pop", "white_pop")
 acs.data <- 
@@ -78,16 +79,9 @@ writeSpatialShape(cents2, "cents2")
 # #just the coords (for plotting)
 # cents
 
-# icons <- awesomeIconList(
-#     MS4 = makeAwesomeIcon(icon = "road", library = "fa", markerColor = "gray"),
-#     Combined = makeAwesomeIcon(icon = "cloud", library = "fa", markerColor = "blue"),
-#     `Non-combined` = makeAwesomeIcon(icon = "tint", library = "fa", markerColor = "green"),
-#     `On-site management` = makeAwesomeIcon(icon = "building-o", library = "fa", markerColor = "cadetblue")
-# )
-
 # Define UI for application
-ui <- navbarPage("Disadvantage Index for Pittsburgh",
-                 theme = shinytheme("united"),
+ui <- navbarPage(span("Disadvantage Index for Pittsburgh"),
+                 theme = shinytheme("superhero"),
                  tabPanel("Map",
                           sidebarLayout(
                               sidebarPanel(
@@ -102,7 +96,7 @@ ui <- navbarPage("Disadvantage Index for Pittsburgh",
                                   # Year Selection ----------------------------------------------
                                   sliderInput("yearSelect",
                                               "Year:",
-                                              min = min(geo.match@data$year, na.rm = T),
+                                              min = min(acs.data$year, na.rm = T),
                                               max = max(geo.match@data$year, na.rm = T),
                                               value = c(min(geo.match@data$year, na.rm = T), max(geo.match@data$year, na.rm = T)),
                                               step = 1)
@@ -118,7 +112,8 @@ ui <- navbarPage("Disadvantage Index for Pittsburgh",
                                   shinyjs::useShinyjs(),
                                   # Style the background and change the page
                                   tags$style(type = "text/css", ".leaflet {height: calc(100vh - 90px) !important;}
-                                         body {background-color: #D4EFDF;}"),
+                                         body {background-color: #033F63;}"),
+                                  tags$head(tags$style(HTML('* {font-family: "Arial"};'))))
                                   # Map Page
                                   leafletOutput("leaflet")
                               )
@@ -135,11 +130,14 @@ ui <- navbarPage("Disadvantage Index for Pittsburgh",
                                               selected = c("42003060300"),
                                               selectize = T,
                                               multiple = T),
+                                  # selectizeInput("variable", "Variable:", c("One", "Two", "Three"),
+                                  #                multiple = TRUE,
+                                  #                options = list(maxItems = 2))
                                   
                                   # Year Selection ----------------------------------------------
                                   sliderInput("yearSelect",
                                               "Year:",
-                                              min = min(acs.data$year, na.rm = T),
+                                              min = min(as.integer(acs.data$year), na.rm = T),
                                               max = max(geo.match@data$year, na.rm = T),
                                               value = c(min(geo.match@data$year, na.rm = T), max(geo.match@data$year, na.rm = T)),
                                               step = 1),
@@ -158,9 +156,9 @@ ui <- navbarPage("Disadvantage Index for Pittsburgh",
                               # Map Panel
                               mainPanel(
                                   fluidRow(
-                                      tabBox(width = 15,
-                                             tabPanel("Racial Composition across", plotlyOutput("plot_years")),
-                                             tabPanel("Black population across tracts", plotlyOutput("plot_tracts")))
+                                      tabBox(width = 20,
+                                             tabPanel("Racial Composition (time)", plotlyOutput("plot_years")),
+                                             tabPanel("Poverty rate (tracts)", plotlyOutput("plot_tracts")))
                                   ),
                               )
                           )
@@ -214,7 +212,7 @@ ui <- navbarPage("Disadvantage Index for Pittsburgh",
                           downloadButton(outputId = "download", 
                                          label = "Download Raw Data",
                                          class = "butt1"),
-                          tags$head(tags$style(".butt1{background-color:blue;} .butt1{color: gray;}")) 
+                          tags$head(tags$style(".butt1{background-color:grau;} .butt1{color: black;}")) 
                  )
 )
 
@@ -225,27 +223,10 @@ server <- function(input, output) {
         leaflet() %>%
             addTiles() %>%
             addProviderTiles("OSM (default)") %>% #or geo.match@data
-            setView(lat = 40.440624, lng = -79.995888, zoom = 10) #%>%
-#            addLayersControl(baseGroups = c("Google", "Wiki"))
+            setView(lat = 40.440624, lng = -79.995888, zoom = 10)
     })
-    # output$leaflet <- renderLeaflet({
-    #     leaflet() %>%
-    #         addProviderTiles(geo.match@data) %>%
-    #         addTiles()  %>%
-    #         setView(lat = 40.440624, lng = -79.995888, zoom = 10) %>%
-    #         addPolygons(
-    #             fillColor = ~colours(zscore_disadvantage),
-    #             stroke=TRUE,
-    #             fillOpacity = 0.9,
-    #             color="white",
-    #             weight=0.3,
-    #             popup = ~paste0("<br/>","Population: ", total_pop,"</br/> ", "Unemployemnt: ", round(100-male_employment_rate,2), "%" , "</br /> ", "Poverty rate: ", all_poverty_pct,"%", "</p/> ", "<b>","Disadvantage score: ", round(zscore_disadvantage, 2), "</b>")
-    #         ) %>%
-    #         addLegend(position = "bottomright", pal = colours, opacity = 0.9, values = ~zscore_disadvantage, title = "disadvantage score") %>%
-    #         addLayersControl(baseGroups = c("Google", "Wiki"))
-    # })
 
-    # # acs data
+    # # subsetting the data accoridng to the inputs
     acs.input2 <- reactive({
         acs <- geo.match@data
         # year select
@@ -260,7 +241,6 @@ server <- function(input, output) {
         if (length(input$raceSelect) > 0 ) {
             acs <- subset(acs, race_pop %in% input$raceSelect)
             }
-        
         return(acs)
     })
     
@@ -268,45 +248,45 @@ server <- function(input, output) {
     observe({
         mybins <- c(-2,-1,0,1,2,3)
         colours <- colorBin(palette = "viridis",
-                            domain = acs$zscore_disadvantage,
+                            domain = mapper@data$zscore_disadvantage,
                             na.color = "transparent",
                             bins = mybins)
         # Data is acs now
         leafletProxy("leaflet", data = geo.match) %>%
-#            clearMarkers() %>%
-            clearGroup(group = "acs.input2()") %>%
+            clearGroup(group = "disadvantage map") %>%
             addPolygons(fillColor = ~colours(zscore_disadvantage),
                         stroke=TRUE,
                         fillOpacity = 0.9,
                         #color="white",
-                        weight = 0.5,
-                        group = "acs.input2()", 
- #                       layerId = ~acsGEOID2, 
+                        weight = 1.0,
+                        group = "disadvantage map", 
                         fill = TRUE, 
-                        color = "green",
+                        color = "yellow",
                         popup = ~paste0("<br/>","Population: ", total_pop,"</br/> ", 
-                                              "Unemployemnt: ", round(100-male_employment_rate,2), "%" , "</br /> ", 
+                                              "Unemploymennt: ", round(100-male_employment_rate,2), "%" , "</br /> ", 
                                               "Poverty rate: ", all_poverty_pct,"%", "</p/> ", 
                                               "<b>","Disadvantage score: ", round(zscore_disadvantage, 2), "</b>")
             ) %>%
-            addLegend(position = "bottomright", pal = colours, opacity = 0.9, values = ~zscore_disadvantage, title = "disadvantage score") %>%
-            addLayersControl(baseGroups = c("Google", "Wiki"))
+            addLegend(position = "bottomright", pal = colours, opacity = 0.9, values = ~zscore_disadvantage, title = "disadvantage score")
     })
     
     observe({
-        # Data is acs now
-        leafletProxy("leaflet", data = geo.match) %>%
-            #            clearMarkers() %>%
-            clearGroup(group = "acs.input2()") %>%
-            addHeatmap(lng = ~cents[,1], lat = ~cents[,2], 
-                       radius = 20, 
-                       intensity = (geo.match@data$black_pop/geo.match@data$total_pop)*100,
-                       blur = 20, 
-                       max = 0.05) %>%
-            addLegend(position = "bottomright", pal = colours, opacity = 0.9, title = "density of black population") #%>%
-#            addLayersControl(baseGroups = c("Google", "Wiki"))
-    })
-
+    leafletProxy("leaflet", data = geo.match) %>%
+        clearGroup(group = "black population heatmap") %>%
+        addHeatmap(lng = ~cents[,1],
+                   lat = ~cents[,2],
+                   radius = 20,
+                   group = "black population heatmap",
+                   intensity = (geo.match@data$black_pop/geo.match@data$total_pop)*100,
+                   blur = 20,
+                   max = 0.05) %>%
+            addLayersControl(
+                baseGroups = c("OSM (default)"),
+                overlayGroups = c("disadvantage map", "black population heatmap"),
+                options = layersControlOptions(collapsed = FALSE)
+)
+})
+    
     # Data Table
     output$table <- DT::renderDataTable(acs.input2(), options = list(scrollX = T))
     # Print Inputs
@@ -319,44 +299,10 @@ server <- function(input, output) {
     # })
     #Download button
     output$download <- downloadHandler('acs.csv', content = function(file){
-        acs.data
-        write.table(acs.data, file, sep = ",", row.names = FALSE)
+        geo.match
+        write.table(geo.match, file, sep = ",", row.names = FALSE)
     })
     
-    # # Create a subset of data filtering for selected genre types ------
-    # # Selected type is the checkbox
-    # sales_subset <- reactive({
-    #     req(input$selected_genre) # ensure availablity of value before proceeding
-    #     filter(sales, Genre %in% input$selected_genre)
-    # })
-    # 
-    # # # Convert plot_title toTitleCase ----------------------------------
-    # # pretty_plot_title1 <- reactive({ toTitleCase(input$plot_title) })
-    # # Create scatterplot object the plotOutput function is expecting --
-    # output$scatterplot <- renderPlot({
-    #     ggplot(data = sales_subset(), aes_string(x = input$x, y = input$y,
-    #                                              color = input$z)) +
-    #         geom_point(size = input$size, alpha = input$alpha) +
-    #         theme(plot.title = element_text(face = "plain", size = 18)) +
-    #         labs(x = toTitleCase(str_replace_all(input$x, "_", " ")),
-    #              y = toTitleCase(str_replace_all(input$y, "_", " ")),
-    #              color = toTitleCase(str_replace_all(input$z, "_", " ")),
-    #              title = pretty_plot_title1()
-    #         )
-    # })
-    # 
-    # Create barplot object  --
-#     output$plot_years <- renderPlot({
-#         ggplot(data = acs.input(), aes(x = input$yearSelect, y = input$y)) +
-# #            stat_summary(fun = sum, geom = "bar") +
-#             geom_bar(fill = "pink", alpha = 1, stat = "identity") +
-#             theme(plot.title = element_text(face = "plain", size = 18)) +
-#             labs(x = "Year",
-#                  y = "Black population across years",
-#                  title = "Global Sales across Years/Platforms"
-#             )
-#     })
-#     
     # A plot showing the racial categories across time -----------------------------
     output$plot_years <- renderPlotly({
         # acs.input2 <- reactive({
@@ -364,29 +310,28 @@ server <- function(input, output) {
         #     if (length(input$raceSelect) > 0 ) {
         #         acs <- subset(acs.input(), race_pop %in% input$raceSelect)
         #     }
-        # 
         #     return(acs)
         # })
         #dat <- subset(acs.input(), "race_pop") #numbers_race_pop
         
         # Generate Plot ----------------------------------------------
-        ggplot(data = acs.input2(), aes(x = round(as.numeric(year),0), y = as.numeric(numbers_race_pop), fill = race_pop)) + 
+        ggplot(data = acs.input2(), aes(x = as.factor(year), y = as.numeric(numbers_race_pop), fill = race_pop)) + 
             geom_bar(stat = "identity", alpha = 0.5) +
             labs( x = "Years",
                   y = "Number of people") +
             theme(legend.title = element_blank())
     })
     
-    # A scatter plot showing the racial categories across location -----------------------------
+    # A scatter plot showing the poverty rate across time -----------------------------
     acs.input <- reactive({
-        acs <- geo.match@data
+        acs <- acs.data1@data
         # year select
         if (length(input$yearSelect) > 0 ) {
             acs <- subset(acs, acs$year >= input$yearSelect[1] & acs$year <= input$yearSelect[2])
         }
         # tract/GEOID selection 
         if (length(input$tractSelect) > 0 ) {
-            acs <- subset(acs, GEOID %in% input$tractSelect)
+            acs <- subset(acs, GEOID2 %in% input$tractSelect)
         }
         
         return(acs)
@@ -394,30 +339,15 @@ server <- function(input, output) {
     
     output$plot_tracts <- renderPlotly({
         # Generate Plot ----------------------------------------------
-        ggplot(data = acs.input(), aes(x = total_pop, y = input$tractSelect)) +#, fill = race_pop)) + 
-#            stat_summary(fun = sum, geom = "point") +
-            geom_point(stat = "identity") +
-            geom_point(size = input$size) +
-            theme(plot.title = element_text(face = "plain", size = 18)) +
-            labs( x = "tracts/GEOIDs",
-                  y = "Number of people") +
+        ggplot(data = acs.input2(), aes(x = as.factor(year), y = all_poverty_pct, fill = GEOID)) + 
+            geom_point(stat = "identity", size = input$size, alpha = 0.5) +
+            geom_line(linetype = 2, alpha = 0.5) +
+#            theme(plot.title = element_text(face = "plain", size = 18)) +
+            labs( x = "Years",
+                  y = "Poverty (%)") +
+            stat_summary(fun.y=sum, geom ="line") +
             theme(legend.title = element_blank())
     })
-    # # Convert plot_title toTitleCase ----------------------------------
-    # pretty_plot_title1 <- reactive({ toTitleCase(input$plot_title) })
-    # # Create scatterplot object the plotOutput function is expecting --
-    # output$scatterplot <- renderPlot({
-    #     ggplot(data = sales_subset(), aes_string(x = input$x, y = input$y,
-    #                                              color = input$z)) +
-    #         geom_point(size = input$size, alpha = input$alpha) +
-    #         theme(plot.title = element_text(face = "plain", size = 18)) +
-    #         labs(x = toTitleCase(str_replace_all(input$x, "_", " ")),
-    #              y = toTitleCase(str_replace_all(input$y, "_", " ")),
-    #              color = toTitleCase(str_replace_all(input$z, "_", " ")),
-    #              title = pretty_plot_title1()
-    #         )
-    # })
-    
 }
 
 # Run the application 
